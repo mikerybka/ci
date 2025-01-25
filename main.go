@@ -29,11 +29,11 @@ func main() {
 func run() {
 	// Read config
 	configFile := os.Getenv("CONFIG_FILE")
-	config := &Config{}
+	config := []string{}
 	util.ReadJSONFile(configFile, &config)
 
 	// Build and push Docker images
-	for _, img := range config.Repos {
+	for _, img := range config {
 		fmt.Println("Building", img)
 		err := build(img)
 		if err != nil {
@@ -107,12 +107,6 @@ func dockerBuildAndPush(img string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
-}
-
-type Config struct {
-	// List of "<user>/<repo>" Github repos with Dockerfiles at the root.
-	// Will clone and run `docker buildx --push` for each repo tagging the image "<user>/<repo>".
-	Repos []string
 }
 
 func waitUntil(timeOfDay string) {
