@@ -98,8 +98,10 @@ func dirExists(dir string) bool {
 
 func dockerBuildAndPush(img string) error {
 	srcDir := os.Getenv("SRC_DIR")
-	cmd := exec.Command("docker", "buildx", "build",
-		"--platform", "linux/amd64,linux/arm64",
+	cmd := exec.Command("docker",
+		// "buildx",
+		"build",
+		// "--platform", "linux/amd64,linux/arm64",
 		"-t", img,
 		"--push",
 		".")
