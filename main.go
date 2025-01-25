@@ -34,7 +34,11 @@ func run() {
 
 	// Build and push Docker images
 	for _, img := range config.Repos {
-		build(img)
+		fmt.Println("Building", img)
+		err := build(img)
+		if err != nil {
+			fmt.Println("ERROR", err)
+		}
 	}
 }
 
@@ -52,13 +56,18 @@ func pull(img string) error {
 
 	if !dirExists(path) {
 		// Clone if not exists
+
+		// Mkdir
 		dir := filepath.Dir(path)
 		err := os.MkdirAll(dir, os.ModePerm)
 		if err != nil {
 			return err
 		}
-		gitURL := fmt.Sprintf("https://github.com/%s.git", img)
+
+		// git clone
+		gitURL := fmt.Sprintf("git@github.com:%s.git", img)
 		cmd := exec.Command("git", "clone", gitURL)
+		cmd.Env = append(os.Environ(), "GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no")
 		cmd.Dir = dir
 		out, err := cmd.CombinedOutput()
 		if err != nil {
@@ -95,6 +104,8 @@ func dockerBuildAndPush(img string) error {
 		"--push",
 		".")
 	cmd.Dir = filepath.Join(srcDir, img)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
