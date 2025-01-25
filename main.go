@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -27,6 +28,8 @@ func main() {
 }
 
 func run() {
+	log.Default().Println("starting deploy")
+
 	// Read config
 	configFile := os.Getenv("CONFIG_FILE")
 	config := []string{}
@@ -34,12 +37,14 @@ func run() {
 
 	// Build and push Docker images
 	for _, img := range config {
-		fmt.Println("Building", img)
+		log.Default().Println("Building", img)
 		err := build(img)
 		if err != nil {
-			fmt.Println("ERROR", err)
+			log.Default().Println("ERROR", err)
 		}
 	}
+
+	log.Default().Println("deploy complete")
 }
 
 func build(img string) error {
