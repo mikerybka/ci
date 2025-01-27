@@ -44,7 +44,56 @@ func run() {
 		}
 	}
 
+	// `docker pull` each image on the server if SERVER_IP is given.
+	for _, img := range config {
+		log.Default().Println("Pulling", img)
+		err := dockerPull(img)
+		if err != nil {
+			log.Default().Println("ERROR", err)
+		}
+	}
+
+	composeDir := os.Getenv("DOCKER_COMPOSE_DIR")
+	if composeDir != "" {
+		// `docker compose down`
+		err := dockerComposeDown(composeDir)
+		if err != nil {
+			log.Default().Println("ERROR", err)
+			return
+		}
+
+		// `docker compose up -d`
+		err = dockerComposeUpD(composeDir)
+		if err != nil {
+			log.Default().Println("ERROR", err)
+			return
+		}
+	}
+
 	log.Default().Println("deploy complete")
+}
+
+func dockerPull(img string) error {
+	cmd := exec.Command("docker", "pull", img)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func dockerComposeUpD(dir string) error {
+	cmd := exec.Command("docker", "compose", "up", "-d")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
+}
+
+func dockerComposeDown(dir string) error {
+	cmd := exec.Command("docker", "compose", "down")
+	cmd.Dir = dir
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }
 
 func build(img string) error {
@@ -59,9 +108,8 @@ func pull(img string) error {
 	srcDir := os.Getenv("SRC_DIR")
 	path := filepath.Join(srcDir, img)
 
+	// Clone if not exists
 	if !dirExists(path) {
-		// Clone if not exists
-
 		// Mkdir
 		dir := filepath.Dir(path)
 		err := os.MkdirAll(dir, os.ModePerm)
