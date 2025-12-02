@@ -2,185 +2,55 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
-	"path/filepath"
+	"strings"
 	"time"
-
-	"github.com/mikerybka/util"
 )
 
 func main() {
-	// If RUN_NOW env var is present, run the build/deploy right away
-	if os.Getenv("RUN_NOW") != "" {
-		run()
+	buildScriptRepoPath := os.Getenv("BUILD_SCRIPT_REPO_PATH")
+	if buildScriptRepoPath == "" {
+		buildScriptRepoPath = "/var/lib/ci/src/build"
 	}
 
-	// If RUN_AT env var is present, run the build every day at RUN_AT time.
-	if os.Getenv("RUN_AT") != "" {
-		for {
-			runAt := os.Getenv("RUN_AT") // format "HH:mm:ss"
-			waitUntil(runAt)
-			run()
+	for {
+		time.Sleep(time.Hour)
+		updated, err := pullBuildScript(buildScriptRepoPath)
+		if err != nil {
+			fmt.Println("pull error:", err)
+		}
+
+		if updated {
+			fmt.Println("starting build")
+			err = build(buildScriptRepoPath)
+			if err != nil {
+				fmt.Println("build error:", err)
+			}
 		}
 	}
 }
 
-func run() {
-	log.Default().Println("starting deploy")
-
-	// Read config
-	configFile := os.Getenv("CONFIG_FILE")
-	config := []string{}
-	util.ReadJSONFile(configFile, &config)
-
-	// Build and push Docker images
-	for _, img := range config {
-		log.Default().Println("Building", img)
-		err := build(img)
-		if err != nil {
-			log.Default().Println("ERROR", err)
-		}
-	}
-
-	// `docker pull` each image on the server if SERVER_IP is given.
-	for _, img := range config {
-		log.Default().Println("Pulling", img)
-		err := dockerPull(img)
-		if err != nil {
-			log.Default().Println("ERROR", err)
-		}
-	}
-
-	composeDir := os.Getenv("DOCKER_COMPOSE_DIR")
-	if composeDir != "" {
-		// `docker compose down`
-		err := dockerComposeDown(composeDir)
-		if err != nil {
-			log.Default().Println("ERROR", err)
-			return
-		}
-
-		// `docker compose up -d`
-		err = dockerComposeUpD(composeDir)
-		if err != nil {
-			log.Default().Println("ERROR", err)
-			return
-		}
-	}
-
-	log.Default().Println("deploy complete")
-}
-
-func dockerPull(img string) error {
-	cmd := exec.Command("docker", "pull", img)
+func pullBuildScript(buildScriptRepoPath string) (bool, error) {
+	cmd := exec.Command("go", "run", "main.go")
+	cmd.Dir = buildScriptRepoPath
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func dockerComposeUpD(dir string) error {
-	cmd := exec.Command("docker", "compose", "up", "-d")
-	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func dockerComposeDown(dir string) error {
-	cmd := exec.Command("docker", "compose", "down")
-	cmd.Dir = dir
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
-func build(img string) error {
-	err := pull(img)
+	out, err := cmd.CombinedOutput()
 	if err != nil {
-		return err
+		os.Stdout.Write(out)
+		return false, err
 	}
-	return dockerBuildAndPush(img)
+	if strings.TrimSpace(string(out)) == "Already up to date." {
+		return false, nil
+	}
+	return true, nil
 }
 
-func pull(img string) error {
-	srcDir := os.Getenv("SRC_DIR")
-	path := filepath.Join(srcDir, img)
-
-	// Clone if not exists
-	if !dirExists(path) {
-		// Mkdir
-		dir := filepath.Dir(path)
-		err := os.MkdirAll(dir, os.ModePerm)
-		if err != nil {
-			return err
-		}
-
-		// git clone
-		gitURL := fmt.Sprintf("git@github.com:%s.git", img)
-		cmd := exec.Command("git", "clone", gitURL)
-		cmd.Env = append(os.Environ(), "GIT_SSH_COMMAND=ssh -o StrictHostKeyChecking=no")
-		cmd.Dir = dir
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			fmt.Println(string(out))
-			return err
-		}
-	} else {
-		// Otherwise pull
-		cmd := exec.Command("git", "pull")
-		cmd.Dir = path
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			fmt.Println(string(out))
-			return err
-		}
-	}
-
-	return nil
-}
-
-func dirExists(dir string) bool {
-	fi, err := os.Stat(dir)
-	if err != nil {
-		return false
-	}
-	return fi.IsDir()
-}
-
-func dockerBuildAndPush(img string) error {
-	srcDir := os.Getenv("SRC_DIR")
-	cmd := exec.Command("docker",
-		// "buildx",
-		"build",
-		// "--platform", "linux/amd64,linux/arm64",
-		"-t", img,
-		"--push",
-		".")
-	cmd.Dir = filepath.Join(srcDir, img)
+func build(buildScriptRepoPath string) error {
+	cmd := exec.Command("go", "run", "main.go")
+	cmd.Dir = buildScriptRepoPath
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
-}
-
-func waitUntil(timeOfDay string) {
-	// Parse time string
-	layout := "15:04:05"
-	tt, err := time.Parse(layout, timeOfDay)
-	if err != nil {
-		panic(err)
-	}
-
-	// Calculate duration to wait
-	now := time.Now()
-	t := time.Date(now.Year(), now.Month(), now.Day(),
-		tt.Hour(), tt.Minute(), tt.Second(), tt.Nanosecond(), time.Local)
-	if t.Before(now) {
-		t = t.Add(24 * time.Hour)
-	}
-	duration := time.Until(t)
-
-	// Wait
-	time.Sleep(duration)
 }
