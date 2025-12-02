@@ -34,8 +34,6 @@ func main() {
 func pullBuildScript(buildScriptRepoPath string) (bool, error) {
 	cmd := exec.Command("go", "run", "main.go")
 	cmd.Dir = buildScriptRepoPath
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		os.Stdout.Write(out)
