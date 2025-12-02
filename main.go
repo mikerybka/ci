@@ -11,7 +11,7 @@ import (
 func main() {
 	buildScriptRepoPath := os.Getenv("BUILD_SCRIPT_REPO_PATH")
 	if buildScriptRepoPath == "" {
-		buildScriptRepoPath = "/var/lib/ci/src/build"
+		buildScriptRepoPath = "/var/lib/src/build"
 	}
 
 	for {
