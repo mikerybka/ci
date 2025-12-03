@@ -32,7 +32,7 @@ func main() {
 }
 
 func pullBuildScript(buildScriptRepoPath string) (bool, error) {
-	cmd := exec.Command("go", "run", "main.go")
+	cmd := exec.Command("git", "pull")
 	cmd.Dir = buildScriptRepoPath
 	out, err := cmd.CombinedOutput()
 	if err != nil {
