@@ -15,7 +15,6 @@ func main() {
 	}
 
 	for {
-		time.Sleep(time.Hour)
 		updated, err := pullBuildScript(buildScriptRepoPath)
 		if err != nil {
 			fmt.Println("pull error:", err)
@@ -28,6 +27,8 @@ func main() {
 				fmt.Println("build error:", err)
 			}
 		}
+
+		time.Sleep(time.Hour)
 	}
 }
 
